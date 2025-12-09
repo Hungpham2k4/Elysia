@@ -28,7 +28,7 @@ export const errorHandler = new Elysia()
     // Debug: Log error để kiểm tra
     console.log("Error handler called:", { code, error, status, errorType: typeof error, errorKeys: error && typeof error === "object" ? Object.keys(error) : [] });
 
-    // 1️⃣ Custom errors
+    // 1️⃣ Custom errors (bao gồm ValidationError từ custom validators)
     if (error instanceof BaseError) {
       return error.toResponse();
     }
