@@ -1,93 +1,75 @@
 import { CreateUserDto, CreateUserInput, UpdateUserDto, UpdateUserInput } from "./user.dto";
-import type { UserService } from "./user.service";
+import { UserService } from "./user.service";
 import { getLang } from "../../utils/lang";
 import { translate } from "../../utils/translations";
+import { Controller } from "../../core/decorators";
+import { container } from "../../core/container";
+import { Elysia } from "elysia";
 
-export const UserController = (app: any) =>
-  app
-    .get(
-      "/",
-      async ({
-        userService,
-        request,
-      }: {
-        userService: UserService;
-        request: Request;
-      }) => {
-        const lang = getLang(request.headers);
-        const users = await userService.findAll(lang);
-        
-        return {
-          message: translate("foundAll", lang),
-          data: users,
-          count: users.length
-        };
-      }
-    )
+@Controller()
+export class UserController {
+  private userService: UserService;
 
-    .get(
-      "/:id",
-      async ({
-        userService,
-        params,
-        request,
-      }: {
-        userService: UserService;
-        params: { id: string };
-        request: Request;
-      }) => {
-        const lang = getLang(request.headers);
-        const user = await userService.findById(params.id, lang);
-        
-        return {
-          message: translate("found", lang),
-          data: user
-        };
-      }
-    )
+  constructor() {
+    // Inject UserService từ container
+    this.userService = container.resolve<UserService>("UserService");
+  }
 
-    .post(
-      "/",
-      async ({
-        userService,
-        body,
-        request,
-      }: {
-        userService: UserService;
-        body: CreateUserInput;
-        request: Request;
-      }) => {
-        const lang = getLang(request.headers);
-        const user = await userService.create(body, lang);
-        
-        return {
-          message: translate("created", lang),
-          data: user
-        };
-      },
-      { body: CreateUserDto }
-    )
+  registerRoutes(app: Elysia) {
+    return app
+      .get(
+        "/",
+        async ({ request }: { request: Request }) => {
+          const lang = getLang(request.headers);
+          const users = await this.userService.findAll(lang);
+          
+          return {
+            message: translate("foundAll", lang),
+            data: users,
+            count: users.length
+          };
+        }
+      )
 
-    .put(
-      "/:id",
-      async ({
-        userService,
-        params,
-        body,
-        request,
-      }: {
-        userService: UserService;
-        params: { id: string };
-        body: UpdateUserInput;
-        request: Request;
-      }) => {
-        const lang = getLang(request.headers);
-        const user = await userService.update(params.id, body, lang);
-        
-        return {
-          message: translate("updated", lang),
-          data: user
-        };
-      },
-      { body: UpdateUserDto }
-    );
+      .get(
+        "/:id",
+        async ({ params, request }: { params: { id: string }; request: Request }) => {
+          const lang = getLang(request.headers);
+          const user = await this.userService.findById(params.id, lang);
+          
+          return {
+            message: translate("found", lang),
+            data: user
+          };
+        }
+      )
+
+      .post(
+        "/",
+        async ({ body, request }: { body: CreateUserInput; request: Request }) => {
+          const lang = getLang(request.headers);
+          const user = await this.userService.create(body, lang);
+          
+          return {
+            message: translate("created", lang),
+            data: user
+          };
+        },
+        { body: CreateUserDto }
+      )
+
+      .put(
+        "/:id",
+        async ({ params, body, request }: { params: { id: string }; body: UpdateUserInput; request: Request }) => {
+          const lang = getLang(request.headers);
+          const user = await this.userService.update(params.id, body, lang);
+          
+          return {
+            message: translate("updated", lang),
+            data: user
+          };
+        },
+        { body: UpdateUserDto }
+      );
+  }
+}

@@ -12,7 +12,8 @@
     "@trpc/server": "^11.7.2",
     "add": "^2.0.6",
     "elysia": "latest",
-    "prismabox": "^1.1.25"
+    "prismabox": "^1.1.25",
+    "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "bun-types": "latest",

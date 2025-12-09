@@ -3,7 +3,9 @@ import type { CreateUserInput, UpdateUserInput } from "./user.dto";
 import { ValidationError } from "../../errors";
 import { NotFoundError } from "../../errors";
 import { translate, type Language } from "../../utils/translations";
+import { Service } from "../../core/decorators";
 
+@Service()
 export class UserService {
   async create(data: CreateUserInput, lang: Language = "vi") {
     try {
