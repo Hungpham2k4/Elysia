@@ -1,17 +1,16 @@
-import { t } from "elysia";
+/**
+ * User DTOs - chỉ định nghĩa types, không dùng Elysia validation
+ * Validation sẽ được thực hiện bằng custom validators trong controller
+ */
 
-export const CreateUserDto = t.Object({
-  email: t.String({ format: "email", error: "Email không hợp lệ" }),
-  name: t.Optional(t.String()),
-  password: t.String({ minLength: 6, error: "Mật khẩu ≥ 6 ký tự" })
-});
+export interface CreateUserInput {
+  email: string;
+  name?: string;
+  password: string;
+}
 
-export type CreateUserInput = typeof CreateUserDto.static;
-
-export const UpdateUserDto = t.Object({
-  email: t.Optional(t.String({ format: "email", error: "Email không hợp lệ" })),
-  name: t.Optional(t.String()),
-  password: t.Optional(t.String({ minLength: 6, error: "Mật khẩu ≥ 6 ký tự" }))
-});
-
-export type UpdateUserInput = typeof UpdateUserDto.static;
+export interface UpdateUserInput {
+  email?: string;
+  name?: string;
+  password?: string;
+}

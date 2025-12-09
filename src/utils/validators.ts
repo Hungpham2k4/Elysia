@@ -1,4 +1,3 @@
-import { t } from "elysia";
 import { ValidationError } from "../errors";
 import { getLang } from "./lang";
 import { translate } from "./translations";

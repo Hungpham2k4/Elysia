@@ -1,11 +1,11 @@
-import { CreateUserDto, CreateUserInput, UpdateUserDto, UpdateUserInput } from "./user.dto";
+import { CreateUserInput, UpdateUserInput } from "./user.dto";
 import { UserService } from "./user.service";
 import { getLang } from "../../utils/lang";
 import { translate } from "../../utils/translations";
 import { Controller, Inject } from "../../core/decorators";
 import type { IController } from "../../core/types";
 import { Elysia } from "elysia";
-import { validateEmail, validatePassword, validateRequired, validateOptionalString } from "../../utils/validators";
+import { validateEmail, validatePassword, validateOptionalString } from "../../utils/validators";
 
 @Controller()
 export class UserController implements IController {
@@ -61,8 +61,6 @@ export class UserController implements IController {
             data: user
           };
         }
-        // Bỏ { body: CreateUserDto } để không dùng Elysia validation
-        // Chỉ dùng custom validators
       )
 
       .put(
@@ -89,8 +87,6 @@ export class UserController implements IController {
             data: user
           };
         }
-        // Bỏ { body: UpdateUserDto } để không dùng Elysia validation
-        // Chỉ dùng custom validators
       );
     
     return result as unknown as Elysia;
