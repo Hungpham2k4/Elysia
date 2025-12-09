@@ -3,7 +3,6 @@ import "reflect-metadata";
 import { MetadataKeys } from "./decorators";
 import { container } from "./container";
 import type { IController, ElysiaGroup } from "./types";
-import type { RouteConfig } from "./route-registry";
 
 export interface ModuleConfig {
   controllers?: (new (...args: any[]) => IController)[];
@@ -131,7 +130,7 @@ export function createAppFromModule(ModuleClass: any, baseApp?: Elysia): Elysia 
 
       // Nếu controller có method registerRoutes, gọi nó
       if (typeof controller.registerRoutes === "function") {
-        controller.registerRoutes(app, container);
+        controller.registerRoutes(app);
       }
     });
   }

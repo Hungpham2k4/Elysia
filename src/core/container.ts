@@ -57,7 +57,7 @@ export class Container {
   resolve<T>(token: Token): T {
     // Check if already resolved (singleton)
     if (this.instances.has(token)) {
-      return this.instances.get(token);
+      return this.instances.get(token) as T;
     }
 
     const definition = this.services.get(token);
@@ -72,7 +72,7 @@ export class Container {
       this.instances.set(token, instance);
     }
 
-    return instance;
+    return instance as unknown as T;
   }
 
   /**
