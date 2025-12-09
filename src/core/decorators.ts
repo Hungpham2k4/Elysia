@@ -8,7 +8,7 @@ const INJECT_METADATA = Symbol("inject");
  * @param options - Options cho service (optional)
  */
 export function Service(options?: { scope?: "singleton" | "transient" }) {
-  return function (target: any) {
+  return function <T extends new (...args: any[]) => any>(target: T): T {
     Reflect.defineMetadata(SERVICE_METADATA, {
       scope: options?.scope || "singleton",
       token: target.name,
@@ -21,7 +21,7 @@ export function Service(options?: { scope?: "singleton" | "transient" }) {
  * Decorator để đánh dấu class là Controller
  */
 export function Controller() {
-  return function (target: any) {
+  return function <T extends new (...args: any[]) => any>(target: T): T {
     Reflect.defineMetadata(CONTROLLER_METADATA, true, target);
     return target;
   };
@@ -32,7 +32,11 @@ export function Controller() {
  * @param token - Token của dependency cần inject
  */
 export function Inject(token: string | Function) {
-  return function (target: any, propertyKey: string | undefined, parameterIndex: number) {
+  return function (
+    target: any,
+    propertyKey: string | symbol | undefined,
+    parameterIndex: number
+  ): void {
     const existingInjections = Reflect.getMetadata(INJECT_METADATA, target) || [];
     existingInjections.push({
       index: parameterIndex,

@@ -2,18 +2,26 @@ import { Elysia } from "elysia";
 import "reflect-metadata";
 import { MetadataKeys } from "./decorators";
 import { container } from "./container";
+import type { IController, ElysiaGroup } from "./types";
+import type { RouteConfig } from "./route-registry";
 
 export interface ModuleConfig {
-  controllers?: any[];
-  providers?: any[];
-  imports?: any[];
+  controllers?: (new (...args: any[]) => IController)[];
+  providers?: (new (...args: any[]) => any)[];
+  imports?: (new () => any)[];
+  routes?: RouteConfig[];
+}
+
+export interface RouteConfig {
+  path: string;
+  controller: new (...args: any[]) => IController;
 }
 
 /**
  * Decorator để đánh dấu class là Module
  */
 export function Module(config: ModuleConfig) {
-  return function (target: any) {
+  return function <T extends new () => any>(target: T): T {
     // Register providers
     if (config.providers) {
       config.providers.forEach((Provider) => {
@@ -28,8 +36,14 @@ export function Module(config: ModuleConfig) {
         if (!metadata) {
           console.warn(`Class ${Controller.name} is not decorated with @Controller()`);
         }
-        // Register controller instance
-        container.register(Controller.name, () => new Controller());
+        // Register controller với dependency injection
+        const controllerInjections = Reflect.getMetadata(MetadataKeys.INJECT, Controller) || [];
+        container.register(Controller.name, () => {
+          const args = controllerInjections
+            .sort((a: { index: number }, b: { index: number }) => a.index - b.index)
+            .map((injection: { token: string }) => container.resolve(injection.token));
+          return new Controller(...args);
+        });
       });
     }
 
@@ -45,16 +59,46 @@ export function Module(config: ModuleConfig) {
         }
         if (importedConfig.controllers) {
           importedConfig.controllers.forEach((Controller) => {
-            container.register(Controller.name, () => new Controller());
+            const controllerInjections = Reflect.getMetadata(MetadataKeys.INJECT, Controller) || [];
+            container.register(Controller.name, () => {
+              const args = controllerInjections
+                .sort((a: { index: number }, b: { index: number }) => a.index - b.index)
+                .map((injection: { token: string }) => container.resolve(injection.token));
+              return new Controller(...args);
+            });
           });
         }
       });
     }
 
-    // Store module config
+    // Store module config (bao gồm routes)
     Reflect.defineMetadata("module", config, target);
     return target;
   };
+}
+
+/**
+ * Lấy tất cả routes từ modules đã import (recursive)
+ */
+export function getAllRoutesFromModules(modules: (new () => any)[]): RouteConfig[] {
+  const allRoutes: RouteConfig[] = [];
+  
+  modules.forEach((ModuleClass) => {
+    const config: ModuleConfig = Reflect.getMetadata("module", ModuleClass) || {};
+    
+    // Lấy routes từ module này
+    if (config.routes) {
+      allRoutes.push(...config.routes);
+    }
+    
+    // Lấy routes từ imported modules (recursive)
+    if (config.imports) {
+      const importedRoutes = getAllRoutesFromModules(config.imports);
+      allRoutes.push(...importedRoutes);
+    }
+  });
+  
+  return allRoutes;
 }
 
 /**

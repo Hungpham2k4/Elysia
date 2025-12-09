@@ -2,21 +2,18 @@ import { CreateUserDto, CreateUserInput, UpdateUserDto, UpdateUserInput } from "
 import { UserService } from "./user.service";
 import { getLang } from "../../utils/lang";
 import { translate } from "../../utils/translations";
-import { Controller } from "../../core/decorators";
-import { container } from "../../core/container";
+import { Controller, Inject } from "../../core/decorators";
+import type { IController } from "../../core/types";
 import { Elysia } from "elysia";
 
 @Controller()
-export class UserController {
-  private userService: UserService;
+export class UserController implements IController {
+  constructor(
+    @Inject(UserService) private readonly userService: UserService
+  ) {}
 
-  constructor() {
-    // Inject UserService từ container
-    this.userService = container.resolve<UserService>("UserService");
-  }
-
-  registerRoutes(app: Elysia) {
-    return app
+  registerRoutes(app: Elysia): Elysia {
+    const result = app
       .get(
         "/",
         async ({ request }: { request: Request }) => {
@@ -71,5 +68,7 @@ export class UserController {
         },
         { body: UpdateUserDto }
       );
+    
+    return result as unknown as Elysia;
   }
 }

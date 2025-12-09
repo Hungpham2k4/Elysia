@@ -3,8 +3,8 @@ import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { errorHandler } from "./plugins/errorHandler";
 import { AppModule } from "./app.module";
-import { UserController } from "./modules/user";
-import { container } from "./core/container";
+import { getAllRoutesFromModules } from "./core/module";
+import { registerRoutes } from "./core/route-registry";
 
 // Initialize AppModule (this will register all providers and controllers)
 const appModule = new AppModule();
@@ -14,9 +14,9 @@ const app = new Elysia()
   .use(cors())
   .use(errorHandler);
 
-// Register routes from UserController
-const userController = container.resolve<UserController>("UserController");
-app.group("/users", (group: any) => userController.registerRoutes(group));
+// Auto-register routes from AppModule (tự động lấy từ imports)
+const routes = getAllRoutesFromModules([AppModule]);
+registerRoutes(app as any, routes);
 
 app.listen(2912);
 

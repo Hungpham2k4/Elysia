@@ -1,22 +1,16 @@
 import "reflect-metadata";
 import { MetadataKeys } from "./decorators";
+import type { ServiceDefinition, InjectionMetadata } from "./types";
 
 type Token = string | Function;
-type Factory<T = any> = () => T;
-
-interface ServiceDefinition {
-  token: Token;
-  factory: Factory;
-  instance?: any;
-  scope: "singleton" | "transient";
-}
+type Factory<T = unknown> = () => T;
 
 /**
  * DI Container - Quản lý tất cả dependencies
  */
 export class Container {
   private services = new Map<Token, ServiceDefinition>();
-  private instances = new Map<Token, any>();
+  private instances = new Map<Token, unknown>();
 
   /**
    * Register một service vào container
@@ -36,22 +30,22 @@ export class Container {
   /**
    * Register một class (tự động detect dependencies)
    */
-  registerClass<T extends new (...args: any[]) => any>(Class: T): void {
+  registerClass<T extends new (...args: unknown[]) => unknown>(Class: T): void {
     const metadata = Reflect.getMetadata(MetadataKeys.SERVICE, Class);
     if (!metadata) {
       throw new Error(`Class ${Class.name} is not decorated with @Service()`);
     }
 
     const token = Class.name;
-    const injections = Reflect.getMetadata(MetadataKeys.INJECT, Class) || [];
+    const injections: InjectionMetadata[] = Reflect.getMetadata(MetadataKeys.INJECT, Class) || [];
     
-    const factory = () => {
+    const factory = (): InstanceType<T> => {
       // Resolve constructor dependencies
       const args = injections
-        .sort((a: any, b: any) => a.index - b.index)
-        .map((injection: any) => this.resolve(injection.token));
+        .sort((a, b) => a.index - b.index)
+        .map((injection) => this.resolve(injection.token));
 
-      return new Class(...args);
+      return new Class(...args) as InstanceType<T>;
     };
 
     this.register(token, factory, { scope: metadata.scope });
