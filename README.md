@@ -10,14 +10,14 @@ Backend API server được xây dựng với **Elysia.js** và **Bun runtime**,
 - 🛡️ **Error Handling** - Centralized error handling với custom error classes
 - 📝 **Type Safety** - TypeScript strict mode với type-safe DI
 - 🔄 **Auto Route Registration** - Tự động đăng ký routes từ modules
-- 🗄️ **Prisma ORM** - Type-safe database access
-- ✅ **Validation** - Schema validation với Elysia TypeBox
+- 🗄️ **Prisma ORM** - Type-safe database access với MariaDB/MySQL adapter
+- ✅ **Custom Validation** - Custom validators với full control over error formatting
 
 ## 📋 Prerequisites
 
 - **Bun** >= 1.0.0 ([Install Bun](https://bun.sh))
-- **Node.js** >= 18.0.0 (optional, for Prisma)
-- **Database** (MariaDB/MySQL/PostgreSQL)
+- **Node.js** >= 18.0.0 (optional, for Prisma CLI)
+- **Database** (MariaDB/MySQL)
 
 ## 🚀 Getting Started
 
@@ -27,17 +27,33 @@ Backend API server được xây dựng với **Elysia.js** và **Bun runtime**,
 bun install
 ```
 
-### 2. Setup Database
+### 2. Setup Environment Variables
 
 ```bash
 # Copy .env.example to .env and configure database
 cp .env.example .env
+```
 
+Edit `.env` file with your database credentials:
+
+```env
+NODE_ENV=development
+PORT=2912
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+DATABASE_USER=root
+DATABASE_PASSWORD=your_password_here
+DATABASE_NAME=teamwork_db
+```
+
+### 3. Setup Database
+
+```bash
 # Run Prisma migrations
 bunx prisma migrate dev
 ```
 
-### 3. Start Development Server
+### 4. Start Development Server
 
 ```bash
 bun run dev
@@ -64,26 +80,29 @@ src/
 │   │   ├── user.module.ts    # Module configuration
 │   │   ├── user.controller.ts # HTTP handlers
 │   │   ├── user.service.ts   # Business logic
-│   │   ├── user.dto.ts       # Data Transfer Objects
-│   │   ├── translations.ts  # Module-specific translations
+│   │   ├── user.dto.ts       # Data Transfer Objects (TypeScript interfaces)
+│   │   ├── translations.ts   # Module-specific translations
 │   │   └── index.ts          # Module exports
-│   ├── product/              # Product module (similar structure)
 │   ├── auth/                 # Auth module (similar structure)
 │   └── prisma/
-│       └── prisma.ts         # Prisma client
+│       └── prisma.ts         # Prisma client configuration
 │
 ├── errors/                   # Custom error classes
 │   ├── BaseError.ts
 │   ├── ValidationError.ts
 │   ├── NotFoundError.ts
-│   └── ...
+│   ├── DatabaseError.ts
+│   ├── AuthError.ts
+│   ├── PermissionError.ts
+│   └── index.ts
 │
-├── plugins/                   # Elysia plugins
+├── plugins/                  # Elysia plugins
 │   └── errorHandler.ts       # Global error handler
 │
-└── utils/                     # Utilities
-    ├── translations.ts        # Translation system (common + module registry)
-    └── lang.ts               # Language detection
+└── utils/                    # Utilities
+    ├── translations.ts       # Translation system (common + module registry)
+    ├── lang.ts               # Language detection
+    └── validators.ts         # Custom validation functions
 ```
 
 ## 🏗️ Architecture Overview
@@ -123,6 +142,7 @@ export class UserModule {}
 ```typescript
 // src/modules/user/user.service.ts
 import { Service } from "../../core/decorators";
+import { prismaClient } from "../prisma/prisma";
 
 @Service()
 export class UserService {
@@ -137,9 +157,11 @@ export class UserService {
 ```typescript
 // src/modules/user/user.controller.ts
 import { Controller, Inject } from "../../core/decorators";
+import type { IController } from "../../core/types";
+import { Elysia } from "elysia";
 
 @Controller()
-export class UserController {
+export class UserController implements IController {
   constructor(
     @Inject(UserService) private readonly userService: UserService
   ) {}
@@ -163,10 +185,9 @@ Import modules vào `AppModule`:
 // src/app.module.ts
 import { Module } from "./core/module";
 import { UserModule } from "./modules/user";
-import { ProductModule } from "./modules/product";
 
 @Module({
-  imports: [UserModule, ProductModule],
+  imports: [UserModule],
 })
 export class AppModule {}
 ```
@@ -228,7 +249,67 @@ translate("userExists", lang);
 translate("created", lang, { field: "User" });
 ```
 
-Language được detect từ `Accept-Language` header.
+Language được detect từ `Accept-Language` header (default: `vi`).
+
+## ✅ Custom Validation
+
+Dự án sử dụng **custom validators** thay vì Elysia's built-in validation để có full control over error formatting.
+
+### Available Validators
+
+```typescript
+import { validateEmail, validatePassword, validateRequired, validateOptionalString } from "../../utils/validators";
+
+// Email validation
+const email = validateEmail(body?.email, "email", lang);
+
+// Password validation với minLength
+const password = validatePassword(body?.password, 6, "password", lang);
+
+// Required string validation
+const name = validateRequired(body?.name, "name", lang);
+
+// Optional string validation
+const optionalName = validateOptionalString(body?.name, "name", lang);
+```
+
+### Usage in Controller
+
+```typescript
+.post("/", async ({ body, request }) => {
+  const lang = getLang(request.headers);
+  
+  // Custom validation - throw ValidationError nếu có lỗi
+  const validatedBody: CreateUserInput = {
+    email: validateEmail(body?.email, "email", lang),
+    name: validateOptionalString(body?.name, "name", lang),
+    password: validatePassword(body?.password, 6, "password", lang)
+  };
+  
+  const user = await this.userService.create(validatedBody, lang);
+  
+  return {
+    message: translate("created", lang),
+    data: user
+  };
+})
+```
+
+### Error Format
+
+Validation errors được trả về với format:
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Dữ liệu không hợp lệ",
+  "fields": {
+    "email": "Email không được để trống",
+    "password": "Mật khẩu ≥ 6 ký tự"
+  },
+  "timestamp": 1765268880359
+}
+```
 
 ## 🛡️ Error Handling
 
@@ -237,7 +318,7 @@ Language được detect từ `Accept-Language` header.
 ```typescript
 // Throw custom errors
 throw new ValidationError({ email: "Email is required" }, lang);
-throw new NotFoundError("userNotFound", lang);
+throw new NotFoundError("User not found");
 throw new DatabaseError("Database connection failed");
 ```
 
@@ -245,9 +326,20 @@ throw new DatabaseError("Database connection failed");
 
 Tất cả errors được xử lý bởi `errorHandler.ts` plugin:
 - Custom errors → Formatted JSON response
-- Validation errors → Field-level error messages
+- Validation errors → Field-level error messages với i18n
 - Prisma errors → Database error messages
 - 404 errors → Not found messages
+
+### Error Response Format
+
+```json
+{
+  "error": "ERROR_TYPE",
+  "message": "Error message",
+  "fields": { /* For ValidationError */ },
+  "timestamp": 1765268880359
+}
+```
 
 ## 📝 API Examples
 
@@ -265,15 +357,29 @@ Accept-Language: en
 }
 ```
 
-**Response:**
+**Success Response:**
 ```json
 {
   "message": "User created successfully",
   "data": {
     "id": "xxx",
     "email": "user@example.com",
-    "name": "John Doe"
+    "name": "John Doe",
+    "password": "password123"
   }
+}
+```
+
+**Error Response (Validation):**
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Dữ liệu không hợp lệ",
+  "fields": {
+    "email": "Email không được để trống",
+    "password": "Mật khẩu ≥ 6 ký tự"
+  },
+  "timestamp": 1765268880359
 }
 ```
 
@@ -293,6 +399,25 @@ Accept-Language: vi
 }
 ```
 
+### Get User by ID
+
+```bash
+GET /users/:id
+Accept-Language: en
+```
+
+**Response:**
+```json
+{
+  "message": "User found successfully",
+  "data": {
+    "id": "xxx",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }
+}
+```
+
 ### Update User
 
 ```bash
@@ -302,6 +427,18 @@ Content-Type: application/json
 {
   "name": "Jane Doe",
   "email": "jane@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "User updated successfully",
+  "data": {
+    "id": "xxx",
+    "email": "jane@example.com",
+    "name": "Jane Doe"
+  }
 }
 ```
 
@@ -319,40 +456,101 @@ src/modules/product/
 └── index.ts
 ```
 
-### 2. Create Service
+### 2. Create DTO (TypeScript interfaces)
+
+```typescript
+// product.dto.ts
+export interface CreateProductInput {
+  name: string;
+  price: number;
+  description?: string;
+}
+
+export interface UpdateProductInput {
+  name?: string;
+  price?: number;
+  description?: string;
+}
+```
+
+### 3. Create Service
 
 ```typescript
 // product.service.ts
 import { Service } from "../../core/decorators";
+import { prismaClient } from "../prisma/prisma";
+import type { CreateProductInput, UpdateProductInput } from "./product.dto";
 
 @Service()
 export class ProductService {
-  async findAll() { ... }
+  async create(data: CreateProductInput, lang: Language = "vi") {
+    return await prismaClient.product.create({ data });
+  }
+
+  async findAll(lang: Language = "vi") {
+    return await prismaClient.product.findMany();
+  }
 }
 ```
 
-### 3. Create Controller
+### 4. Create Controller
 
 ```typescript
 // product.controller.ts
 import { Controller, Inject } from "../../core/decorators";
+import type { IController } from "../../core/types";
+import { Elysia } from "elysia";
+import { ProductService } from "./product.service";
+import { getLang } from "../../utils/lang";
+import { translate } from "../../utils/translations";
+import { validateRequired, validateOptionalString } from "../../utils/validators";
 
 @Controller()
-export class ProductController {
+export class ProductController implements IController {
   constructor(
     @Inject(ProductService) private readonly productService: ProductService
   ) {}
 
   registerRoutes(app: Elysia): Elysia {
-    return app.get("/", async () => {
-      const products = await this.productService.findAll();
-      return { data: products };
-    });
+    return app
+      .get("/", async ({ request }) => {
+        const lang = getLang(request.headers);
+        const products = await this.productService.findAll(lang);
+        return { message: translate("foundAll", lang), data: products };
+      })
+      .post("/", async ({ body, request }) => {
+        const lang = getLang(request.headers);
+        
+        const validatedBody = {
+          name: validateRequired(body?.name, "name", lang),
+          price: Number(body?.price),
+          description: validateOptionalString(body?.description, "description", lang)
+        };
+        
+        const product = await this.productService.create(validatedBody, lang);
+        return { message: translate("created", lang), data: product };
+      });
   }
 }
 ```
 
-### 4. Create Module
+### 5. Create Translations
+
+```typescript
+// translations.ts
+export const productTranslations = {
+  en: {
+    created: "Product created successfully",
+    foundAll: "Products retrieved successfully",
+  },
+  vi: {
+    created: "Tạo sản phẩm thành công",
+    foundAll: "Lấy danh sách sản phẩm thành công",
+  },
+} as const;
+```
+
+### 6. Create Module
 
 ```typescript
 // product.module.ts
@@ -374,10 +572,23 @@ registerTranslations("product", productTranslations);
 export class ProductModule {}
 ```
 
-### 5. Import into AppModule
+### 7. Export Module
+
+```typescript
+// index.ts
+export * from "./product.module";
+export * from "./product.service";
+export * from "./product.controller";
+```
+
+### 8. Import into AppModule
 
 ```typescript
 // app.module.ts
+import { Module } from "./core/module";
+import { UserModule } from "./modules/user";
+import { ProductModule } from "./modules/product";
+
 @Module({
   imports: [UserModule, ProductModule], // Add here
 })
@@ -415,6 +626,7 @@ bunx prisma studio
 - **Runtime**: [Bun](https://bun.sh) - Fast JavaScript runtime
 - **Framework**: [Elysia.js](https://elysiajs.com) - Fast and friendly web framework
 - **ORM**: [Prisma](https://www.prisma.io) - Next-generation ORM
+- **Database**: MariaDB/MySQL (via Prisma adapter)
 - **Language**: TypeScript with strict mode
 - **DI System**: Custom implementation (inspired by NestJS/Spring Boot)
 
